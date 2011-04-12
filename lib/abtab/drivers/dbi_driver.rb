@@ -1,5 +1,6 @@
 require 'dbi'
 require 'yaml'
+require 'cgi'
 
 class Abtab::Driver::DbiDriver < Abtab::Driver
   CREDENTIALS_RC_FILE = "#{ENV['HOME']}/.abtab.dbrc"
@@ -47,6 +48,11 @@ class Abtab::Driver::DbiDriver < Abtab::Driver
     # expect 'driver' name, eg: pg
     driver, host, database_name, table = rest.split '/', 4
 
+    params = nil
+    table, params = table.split '?', 2
+    uri = URI.parse url
+    @options[:params] = CGI.parse(uri.query)
+
     if driver =~ /@/
       user_pass, driver = driver.split '@', 2
       user, pass = nil, nil
@@ -75,10 +81,36 @@ class Abtab::Driver::DbiDriver < Abtab::Driver
 
   end
 
+  def select_cols
+    cols = "*"
+    if !@options[:params]["cols"].nil? && !@options[:params]["cols"].empty?
+      cols = @options[:params]["cols"].join(",")
+    end
+  end
+
   def open_for_reading
     if @options[:table]
       @columns = get_col_names @options[:table]
-      @statement_handle = @conn.prepare "select * from #{@options[:table]}"
+      # NB: LIMIT may not be sql standard?
+      cols = select_cols
+      @sql_stmt = "select #{cols} from #{@options[:table]}"
+
+      if !@options[:params]["order"].nil? && !@options[:params]["order"].empty?
+        sort_cols = @options[:params]["order"].map do |c|
+          if c.start_with? '-'
+            "#{c[1..-1]} DESC"
+          else
+            "#{c} ASC"
+          end
+        end.join(",")
+        @sql_stmt = "#{@sql_stmt} ORDER BY #{sort_cols}"
+      end
+
+      if !@options[:params]["limit"].nil? && !@options[:params]["limit"].empty?
+        @sql_stmt = "#{@sql_stmt} LIMIT #{@options[:params]["limit"].first}"
+      end
+
+      @statement_handle = @conn.prepare @sql_stmt
       @statement_handle.execute
     else
       @columns = ['NAME','ROWS']
@@ -100,7 +132,8 @@ class Abtab::Driver::DbiDriver < Abtab::Driver
   end
 
   def get_col_names table
-    sth = @conn.prepare "SELECT * FROM #{table} where 1=0"
+    cols = select_cols
+    sth = @conn.prepare "SELECT #{select_cols} FROM #{table} where 1=0"
     sth.execute
     col_names = sth.column_names
     sth.finish
