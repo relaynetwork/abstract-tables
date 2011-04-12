@@ -10,7 +10,7 @@ task :install do
     gem_bin = `which gem`
     use_sudo = gem_bin.start_with?(ENV['HOME']) ? "" : "sudo"
     puts "gem build #{gemspec_file} && #{use_sudo} gem install #{gemfile_basename}-*.gem" 
-    system "gem build #{gemspec_file} && #{use_sudo} gem install #{gemfile_basename}-*.gem" 
+    system "gem build #{gemspec_file} && #{use_sudo} gem install #{gemfile_basename}-*.gem --no-rdoc --no-ri" 
   end
 end
 
@@ -21,7 +21,7 @@ task :build do
   gemfile_basename = File.basename(gemspec_file,'.gemspec')
   gem_bin = `which gem`
   use_sudo = gem_bin.start_with?(ENV['HOME']) ? "" : "sudo"
-  system "gem build #{gemspec_file} && #{use_sudo} gem install #{gemfile_basename}-*.gem" 
+  system "gem build #{gemspec_file}"
 end
 
 desc "push the gem"
