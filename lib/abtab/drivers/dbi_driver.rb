@@ -86,6 +86,7 @@ class Abtab::Driver::DbiDriver < Abtab::Driver
     if !@options[:params]["cols"].nil? && !@options[:params]["cols"].empty?
       cols = @options[:params]["cols"].join(",")
     end
+    cols
   end
 
   def open_for_reading
